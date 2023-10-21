@@ -37,8 +37,7 @@ while not port:
                 break
     time.sleep(0.1)
 
-arduino = serial.Serial(port=port, baudrate=115200, timeout=1) 
-arduino.write_timeout = 0
+arduino = serial.Serial(port=port, baudrate=115200, timeout=1, rtscts=True, write_timeout=True) 
 arduino.reset_input_buffer()
 arduino.reset_output_buffer()
 

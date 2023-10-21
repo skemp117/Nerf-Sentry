@@ -31,6 +31,8 @@ AccelStepper el_stepper(AccelStepper::DRIVER, Y_STP, Y_DIR); // Defaults to Acce
 long az = 0; // delta Azimuth in units of arcseconds (1/3600th of a degree)
 long el = 0; // delta Elevation in units of arcseconds (1/3600th of a degree)
 
+bool send_serial = false;
+
 void setup() {
   Serial.begin(115200); // Set the baud rate to match your communication rate
   // Clear serial buffer
@@ -89,7 +91,7 @@ void getStepperCommands(){
       el_stepper.move(el_steps);
     }
 
-    if (serial_update) {
+    if (serial_update && send_serial) {
       Serial.print("Az steps: ");
       Serial.print(az_steps);
       Serial.print("\t El steps: ");
@@ -97,5 +99,3 @@ void getStepperCommands(){
     }
   }
 }
-
-
