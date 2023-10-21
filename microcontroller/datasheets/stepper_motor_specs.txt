@@ -1,0 +1,36 @@
+General specification
+Step angle: 1.8&deg;
+
+Number of phase：2
+
+Insulation resistance：100M&Omega;min. (500V DC)
+
+Insulation class：Class B
+
+Rotor inertia：38g cm2 
+
+Mass：0.2kg
+
+Wiring length: 700mm
+
+Connector: XH (2.54mm-4pin)
+
+Net weight: 232g
+
+Shipping weight: 310g
+
+ 
+
+Electrical specification
+
+Rated voltage：5V
+
+Rated voltage: 1.0A
+
+Resistance per phase: 5.0&Omega;&plusmn;10%
+
+Inductance per phase: 6.2mH&plusmn;20%
+
+Holding torque: 300mN.m
+
+Detent torque: 12mN.m
