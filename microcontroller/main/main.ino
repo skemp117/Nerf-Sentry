@@ -8,17 +8,18 @@
 #define Z_DIR 7
 
 #define MAX_STEP_SPEED 4000 // Limit of accelstepper on arduino uno
+#define ACCELRATION 10000
 
 #define FULL_STEPS_PER_REV 200 // stepper motor specific
 #define DEGREES_PER_REV 360
 #define DEGREE_MULTIPLIER 3600 // conversion from degrees to arcsecs
 
 #define AZ_DIRECTION 1 // pos goes left when this is negative
-#define AZ_MICROSTEPS 2
+#define AZ_MICROSTEPS 8
 #define AZ_GEAR_RATIO 144/17 // gear ratio converts from desired output to needed input, if we need 17 degrees, we need to move the stepper 144 degrees
 
 #define EL_DIRECTION -1 // pos goes down when this is negative
-#define EL_MICROSTEPS 2
+#define EL_MICROSTEPS 8
 #define EL_GEAR_RATIO 64/21
 
 // Includes
@@ -41,9 +42,9 @@ void setup() {
   }
 
   az_stepper.setMaxSpeed(MAX_STEP_SPEED);
-  az_stepper.setAcceleration(1000.0);
+  az_stepper.setAcceleration(ACCELRATION);
   el_stepper.setMaxSpeed(MAX_STEP_SPEED);
-  el_stepper.setAcceleration(1000.0);
+  el_stepper.setAcceleration(ACCELRATION);
 }
 
 void loop(){
