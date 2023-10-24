@@ -14,11 +14,11 @@
 #define DEGREES_PER_REV 360
 #define DEGREE_MULTIPLIER 3600 // conversion from degrees to arcsecs
 
-#define AZ_DIRECTION 1 // pos goes left when this is negative
+#define AZ_DIRECTION -1 // pos goes left when this is negative
 #define AZ_MICROSTEPS 8
 #define AZ_GEAR_RATIO 144/17 // gear ratio converts from desired output to needed input, if we need 17 degrees, we need to move the stepper 144 degrees
 
-#define EL_DIRECTION -1 // pos goes down when this is negative
+#define EL_DIRECTION 1 // pos goes down when this is negative
 #define EL_MICROSTEPS 8
 #define EL_GEAR_RATIO 64/21
 
