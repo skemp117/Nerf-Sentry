@@ -31,8 +31,10 @@ AccelStepper el_stepper(AccelStepper::DRIVER, Y_STP, Y_DIR); // Defaults to Acce
 
 long az = 0; // delta Azimuth in units of arcseconds (1/3600th of a degree)
 long el = 0; // delta Elevation in units of arcseconds (1/3600th of a degree)
+long ra = 0; // estimated range of target in mm
+int fs = 0; // fire signal
 
-bool send_serial = false;
+bool send_serial = true;
 
 void setup() {
   Serial.begin(115200); // Set the baud rate to match your communication rate
@@ -92,11 +94,28 @@ void getStepperCommands(){
       el_stepper.move(el_steps);
     }
 
+    token = strchr(buffer, 'r');
+    if (token != NULL) {
+      token++;
+      ra = atol(token); // Convert the 'r' part to a long
+    }
+
+    token = strchr(buffer, 'f');
+    if (token != NULL) {
+      token++;
+      fs = atoi(token); // Convert the 'r' part to a long
+    }
+
     if (serial_update && send_serial) {
       Serial.print("Az steps: ");
       Serial.print(az_steps);
       Serial.print("\t El steps: ");
-      Serial.println(el_steps);
+      Serial.print(el_steps);
+      Serial.print("\t Range: ");
+      Serial.print(ra);
+      Serial.print("\t Fire: ");
+      Serial.print(fs);
+      Serial.println();
     }
   }
 }
