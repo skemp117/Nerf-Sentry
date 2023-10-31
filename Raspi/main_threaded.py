@@ -39,6 +39,8 @@ SRC_SIZE = (640,480)
 
 METER_TO_MM = 1000
 
+ARDUINO_READ = False
+
 # Functions
 def draw_objects(img, detections, color):
   """Draws the bounding box and label for each object."""
@@ -118,7 +120,7 @@ def select_foe(foes, last_target_id):
         return foes, None, last_target_id
 
     # Check if last foe is still available, just use that one
-    foe = foes[foes[:,-1] == last_target_id]
+    foe = foes[np.where(foes[:,-1] == last_target_id)[0], :]
     if foe.size > 0:
         center_pt = get_aim_center(foes)[0]
     else:
@@ -186,25 +188,31 @@ def fire_timeout():
         # add last fired time to list
     pass
 
-def write_to_arduino(target_params, fire_signal):
+def write_to_arduino(target_params, fire_signal, image_taken_at):
     if not np.any(target_params):
         arduino.reset_input_buffer()
         arduino.reset_output_buffer()
         return False
+    time_offset = (time.perf_counter()-image_taken_at) * 1000000 # get delta T in microseconds
+    # Should I add estimated baud rate transmission delay?
+
     # a: azimuth in arcseconds
     # e: elevation in arcseconds
     # r: range in meters
     # f: fire boolean
+    # o: time offset
     x = f"a{target_params[0]:.0f}\
         e{target_params[1]:.0f}\
         r{target_params[2]:.0f}\
-        f{fire_signal: .0f}"
+        f{fire_signal:.0f}\
+        o{time_offset:.0f}"
     arduino.write(bytes(x + '\n', 'utf-8')) 
     data = 0
-    while not data:
-        data = arduino.readline().decode().strip()
-        time.sleep(0.01)
-    print(data)
+    if ARDUINO_READ:
+        while not data:
+            data = arduino.readline().decode().strip()
+            time.sleep(0.01)
+        print(data)
     arduino.reset_input_buffer()
     arduino.reset_output_buffer()
 
@@ -271,6 +279,7 @@ def get_image_and_infer():
     while True:
         # Get image
         full_image = cv2.flip(picam2.capture_array("main"),0)
+        got_image_at = time.perf_counter()
         
         # input to model
         image = cv2.resize(full_image, inference_size, interpolation=cv2.INTER_NEAREST)
@@ -280,7 +289,7 @@ def get_image_and_infer():
         # Perform Inference
         interpreter.invoke()
         detections = get_objects(interpreter, threshold, scale)
-        data = (full_image, detections)
+        data = (full_image, detections, got_image_at)
         if process_inference_queue.empty():
             process_inference_queue.put_nowait(data)
         else:
@@ -293,7 +302,7 @@ def process_inference():
 
     while True:
         data = process_inference_queue.get()
-        full_image, detections = data
+        full_image, detections, got_image_at = data
         # Extract results
         if detections.size == 0:
             print('No objects detected') 
@@ -316,7 +325,7 @@ def process_inference():
             draw_objects(full_image, foes, (255,0,0))
             draw_objects(full_image, foe, foe_color)
 
-            write_to_arduino(target_params, fire_signal)
+            write_to_arduino(target_params, fire_signal, got_image_at)
 
         av_fps = next(fps_counter)
 

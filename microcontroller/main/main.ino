@@ -22,6 +22,17 @@
 #define EL_MICROSTEPS 8
 #define EL_GEAR_RATIO 64/21
 
+#define BUFFER_SIZE 100
+#define BUFFER_RESOLUTION 1000 // buffer updates every ___ microseconds
+
+#define SEND_SERIAL false
+
+#define BAUD_RATE 115200
+#define SERIAL_BUF_SIZE 64
+#define TRANS_DELAY SERIAL_BUF_SIZE*1000000/BAUD_RATE
+
+#define P_GAIN 0.5
+
 // Includes
 #include <AccelStepper.h>
 
@@ -32,12 +43,20 @@ AccelStepper el_stepper(AccelStepper::DRIVER, Y_STP, Y_DIR); // Defaults to Acce
 long az = 0; // delta Azimuth in units of arcseconds (1/3600th of a degree)
 long el = 0; // delta Elevation in units of arcseconds (1/3600th of a degree)
 long ra = 0; // estimated range of target in mm
+unsigned long dt = 0; // time offset in microseconds
 int fs = 0; // fire signal
 
-bool send_serial = true;
+unsigned long timeMicrosBuffer[BUFFER_SIZE]; // buffering positions while motors are running
+int head = 0;
+int tail = 0;
+
+long azPosBuffer[BUFFER_SIZE]; // buffering positions while motors are running
+long elPosBuffer[BUFFER_SIZE]; // buffering positions while motors are running
+
+unsigned long time_last = 0;
 
 void setup() {
-  Serial.begin(115200); // Set the baud rate to match your communication rate
+  Serial.begin(BAUD_RATE); // Set the baud rate to match your communication rate
   // Clear serial buffer
   while(Serial.available() > 0) {
     char t = Serial.read();
@@ -53,6 +72,48 @@ void loop(){
   getStepperCommands();
   az_stepper.run();
   el_stepper.run();
+  if (micros()-time_last > BUFFER_RESOLUTION){
+    addToTimeBuffer(timeMicrosBuffer, head, micros()); // note micros wraps at 70 minutes
+    addToBuffer(azPosBuffer, head, az_stepper.currentPosition());
+    addToBuffer(elPosBuffer, head, el_stepper.currentPosition());
+    time_last = micros();
+  }
+}
+
+int getPosIdAtTime(long timeDelta){
+  int id = head;
+  unsigned long timeNow = 0;
+  while (id != tail) {
+    id = (id - 1) % BUFFER_SIZE;
+    timeNow = micros()-timeMicrosBuffer[id];
+    if (timeNow >= timeDelta){
+      break;
+    }
+  }
+  return id;
+}
+
+// Function to add data to the FIFO buffer
+void addToTimeBuffer(unsigned long* buffer, int& head, long data) {
+  buffer[head] = data;
+  head = (head + 1) % BUFFER_SIZE; // Wrap around if the buffer is full
+}
+
+void addToBuffer(long* buffer, int& head, long data) {
+  buffer[head] = data;
+  head = (head + 1) % BUFFER_SIZE; // Wrap around if the buffer is full
+}
+
+// Function to remove and return data from a specified buffer
+int removeFromBuffer(int* buffer, int& tail) {
+  int data = buffer[tail];
+  tail = (tail + 1) % BUFFER_SIZE;
+  return data;
+}
+
+// Function to check if a specified buffer is empty
+bool isBufferEmpty(int head, int tail) {
+  return head == tail;
 }
 
 long convertAzToSteps(long az){
@@ -70,7 +131,7 @@ void getStepperCommands(){
   long az_steps = 0;
   long el_steps = 0;
   if (Serial.available() > 0) {
-    char buffer[32]; // Adjust the buffer size as needed
+    char buffer[SERIAL_BUF_SIZE]; // Adjust the buffer size as needed
     int bytesRead = Serial.readBytesUntil('\n', buffer, sizeof(buffer) - 1);
     bool serial_update = false;
     buffer[bytesRead] = '\0'; // Null-terminate the string
@@ -80,42 +141,67 @@ void getStepperCommands(){
     if (token != NULL) {
       token++;
       az = atol(token); // Convert the 'a' part to a long
-      az_steps = convertAzToSteps(az);
       serial_update = true;
-      az_stepper.move(az_steps);
     }
 
     token = strchr(buffer, 'e');
     if (token != NULL) {
       token++;
       el = atol(token); // Convert the 'e' part to a long
-      el_steps = convertElToSteps(el);
       serial_update = true;
-      el_stepper.move(el_steps);
     }
 
     token = strchr(buffer, 'r');
     if (token != NULL) {
       token++;
       ra = atol(token); // Convert the 'r' part to a long
+      serial_update = true;
     }
 
     token = strchr(buffer, 'f');
     if (token != NULL) {
       token++;
       fs = atoi(token); // Convert the 'r' part to a long
+      serial_update = true;
     }
 
-    if (serial_update && send_serial) {
-      Serial.print("Az steps: ");
-      Serial.print(az_steps);
-      Serial.print("\t El steps: ");
-      Serial.print(el_steps);
-      Serial.print("\t Range: ");
-      Serial.print(ra);
-      Serial.print("\t Fire: ");
-      Serial.print(fs);
-      Serial.println();
+    token = strchr(buffer, 'o');
+    if (token != NULL) {
+      token++;
+      dt = atol(token); // Convert the 'o' part to a long
+      serial_update = true;
+    }
+
+    if (serial_update) {
+      az = P_GAIN*az;
+      el = .1*el;
+
+      
+      int id = getPosIdAtTime(dt+TRANS_DELAY);
+      long az_offset = az_stepper.currentPosition() - azPosBuffer[id];
+      long el_offset = el_stepper.currentPosition() - elPosBuffer[id];
+      
+      az_steps = convertAzToSteps(az) - az_offset;
+      el_steps = convertElToSteps(el) - el_offset;
+
+      az_stepper.move(az_steps);
+      el_stepper.move(el_steps);
+  
+      if (SEND_SERIAL) {
+        Serial.print("Az steps: ");
+        Serial.print(az_steps);
+        Serial.print("\tEl steps: ");
+        Serial.print(el_steps);
+        Serial.print("\tRange: ");
+        Serial.print(ra);
+        Serial.print("\tFire: ");
+        Serial.print(fs);
+        Serial.print("\tOffset: ");
+        Serial.print(dt);
+        Serial.print("\tO_id: ");
+        Serial.print(id);
+        Serial.println();
+      }
     }
   }
 }
